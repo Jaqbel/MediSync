@@ -82,4 +82,4 @@ Follow these steps to run the MediSync application locally.
    - **Port conflicts:**  
      Adjust ports in `server/index.ts` or `vite.config.ts` if 3000 or 5173 are in use.
 
-Enjoy developing MediSync locally!
+Enjoy developing MediSync locally! 

@@ -1,0 +1,98 @@
+1. Objective
+Add a comprehensive Treatment History feature for each patient, capturing the date, medication administered, clinical notes, and supporting photographic documentation. This module will integrate seamlessly with our existing patient and stock management systems, providing both online and offline capabilities.
+
+2. Data Model
+treatment_history table:
+
+id (PK)
+
+patient_id → references patients(id)
+
+drug_id → references stock(id)
+
+date (timestamp)
+
+notes (text)
+
+photo_urls (array of text URLs)
+
+Supabase Storage:
+
+Bucket named treatment-photos
+
+Files stored at path treatment-photos/{patient_id}/{uuid}.{ext}
+
+Public or signed URLs served back to the client
+
+3. Backend Services
+Photo Upload Service
+
+Receives image files, uploads to Supabase Storage, returns an array of public URLs.
+
+History CRUD Service
+
+getHistory(patientId): fetches all history records for a patient, ordered by date.
+
+addHistory(record): inserts a new treatment record, including photo_urls.
+
+Both services are exposed via our existing API layer and utilize transactions to ensure atomicity (photos uploaded before the database insert).
+
+4. React Data Hook
+Implement a useHistory(patientId) hook that:
+
+Query: Retrieves the patient’s history from local IndexedDB/SQLite cache first, then syncs with Supabase.
+
+Mutation:
+
+Uploads photos in parallel.
+
+Creates a history record with patient_id, drug_id, date, notes, and returned photo_urls.
+
+Invalidates the cache to refresh the list.
+
+Leverages React Query for caching, offline queuing, and automatic retry upon reconnection.
+
+5. User Interface
+5.1. History List Screen
+Displays a reverse-chronological list of treatments: date, medication name, and photo thumbnail carousel.
+
+Tapping a record opens detailed view with full-size images and clinical notes.
+
+5.2. Add Treatment Modal
+Form fields:
+
+Date (DatePicker)
+
+Medication (dropdown populated from stock)
+
+Notes (multiline text input)
+
+Photos (multi-file selector / camera picker)
+
+“Save” button triggers the addHistory mutation.
+
+5.3. Detail View
+Full-screen image gallery
+
+Editable notes and option to add more photos
+
+6. Offline & Synchronization
+Local Storage Schema: Extend Dexie/SQLite version to include treatment_history with identical fields.
+
+Sync Queue: Upon network restoration, automatically:
+
+Upload any pending photos.
+
+Push new records to Supabase.
+
+Resolve conflicts by last-write-wins or prompting the user for manual resolution.
+
+7. Security & Privacy
+All images and data transmitted over HTTPS.
+
+Photos stored with access controls (public URLs only if permitted; otherwise, signed URLs).
+
+Patient-boundary enforcement: users can only read/write history for patients they own.
+
+GDPR- and HIPAA-aligned retention policies configurable in Supabase.
+

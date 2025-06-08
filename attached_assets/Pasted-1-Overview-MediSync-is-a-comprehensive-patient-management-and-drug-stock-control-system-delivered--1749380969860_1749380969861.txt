@@ -1,0 +1,162 @@
+1. Overview
+MediSync is a comprehensive patient management and drug-stock control system, delivered as both a Progressive Web App (PWA) and a native mobile application. Our goal is to enable healthcare professionals to securely access and manage patient records and inventories from web browsers, tablets, smartphones, or desktops—online or offline—while maintaining a unified codebase and seamless user experience across all platforms.
+
+2. Monorepo Architecture
+bash
+Copiar
+Editar
+/medisync
+├─ /apps
+│   ├─ /mobile       ← React Native (iOS & Android, via Expo)
+│   └─ /web          ← React Native Web → PWA
+├─ /packages
+│   ├─ /ui           ← Shared component library (Tailwind, shadcn/ui)
+│   ├─ /services     ← Data-access layer (Supabase, SQLite, IndexedDB)
+│   └─ /hooks        ← Custom React hooks (useAuth, usePatients, useStock)
+├─ package.json
+└─ tsconfig.json
+Apps
+
+mobile: Built with Expo, uses expo-sqlite for client-side storage and expo-secure-store for credentials.
+
+web: Leverages React Native Web to reuse the same UI components; configured as a PWA (service worker, manifest.json).
+
+Packages
+
+ui: A design system of Buttons, Cards, Forms, etc., implemented in React Native + Tailwind/Twin.macro.
+
+services:
+
+auth.ts: Wrapper around Supabase Auth plus local credential caching.
+
+db.ts: Abstraction over expo-sqlite and Dexie.js for offline persistence and sync.
+
+hooks: Encapsulate data fetching and mutations via React Query or Zustand.
+
+3. Technology Stack
+Layer	Tools / Libraries
+UI	React Native, React Native Web, Twin.macro
+Navigation	React Navigation
+State Management	React Query (with persistence) or Zustand
+Offline Storage	expo-sqlite (mobile), Dexie.js (web)
+Data Sync	Supabase Realtime + Cloud Functions
+Authentication	Supabase Auth + JWT local caching
+Testing	Jest, React Native Testing Library, Cypress
+CI/CD	GitHub Actions, Expo Application Services (EAS)
+
+4. Data Flow & Synchronization
+Offline Mode
+– All writes go to the local database (SQLite on mobile, IndexedDB on web).
+
+Sync Queue
+– A background service batches local changes and pushes them to Supabase whenever connectivity is restored; handles conflict resolution.
+
+Realtime Updates
+– Subscribes to Supabase channels to receive live updates from other devices.
+
+5. Core Features
+5.1 Authentication Module
+User Registration & Login
+
+Secure credential handling with local hashing and future migration to cloud-based auth (Supabase Auth + JWT).
+
+Token storage in expo-secure-store (mobile) and IndexedDB (web).
+
+5.2 Patient Management
+Create, edit, and view patient profiles (name, contact, medical history).
+
+Associate each patient with the logged-in physician.
+
+Detailed clinical history viewer.
+
+5.3 Drug Stock Control
+Inventory CRUD for medications (name, quantity, expiration date).
+
+Automated low-stock and expiry notifications.
+
+User-specific stock tables.
+
+6. Database Schema
+All tables are mirrored locally and in Supabase (PostgreSQL) for seamless sync.
+
+sql
+Copiar
+Editar
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL
+);
+
+CREATE TABLE patients (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT,
+  medical_history TEXT
+);
+
+CREATE TABLE stock (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_name TEXT NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  expiration_date DATE
+);
+7. Example Data Hook (usePatients)
+ts
+Copiar
+Editar
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { db } from '../services/db';
+
+export function usePatients() {
+  const qc = useQueryClient();
+
+  const query = useQuery(['patients'], () => db.patients.toArray());
+
+  const addPatient = useMutation(
+    newPatient => db.patients.add(newPatient)
+      .then(id => {
+        queueSync('patients', 'insert', { ...newPatient, id });
+        return { ...newPatient, id };
+      }),
+    { onSuccess: () => qc.invalidateQueries(['patients']) }
+  );
+
+  return {
+    ...query,
+    addPatient: addPatient.mutateAsync,
+    // updatePatient, removePatient logic...
+  };
+}
+8. Development Roadmap
+Monorepo Setup
+– Configure Yarn Workspaces or PNPM.
+
+Bootstrap with Expo
+– expo init medisync + enable web support.
+
+UI Library
+– Establish /packages/ui with design tokens and base components.
+
+Data Layer
+– Implement /packages/services for local & remote data access.
+
+Screens & Navigation
+– Build authentication flow and main tabs (Patients, Stock, Profile).
+
+Offline/Online Sync
+– Develop sync queue and real-time listeners.
+
+Testing & CI/CD
+– Set up tests and automate builds via GitHub Actions & EAS.
+
+9. Next Steps
+Approve architecture and finalize technology choices.
+
+Kick off repo setup and initial scaffolding.
+
+Plan sprints around auth, data persistence, UI components, and sync.
+
+We look forward to your feedback and to refining any specific area—whether it’s deeper offline-sync strategies, Expo Web configuration, or advanced testing pipelines.
